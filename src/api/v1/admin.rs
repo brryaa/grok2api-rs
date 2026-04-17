@@ -23,6 +23,7 @@ use crate::services::grok::assets::{DeleteService, DownloadService, ListService}
 use crate::services::grok::batch::{OnItem, ShouldCancel, run_in_batches};
 use crate::services::grok::nsfw::NsfwService;
 use crate::services::token::get_token_manager;
+use crate::services::token::scheduler::{refresh_tokens_with_tracking, snapshot_refresh_state};
 
 pub fn router() -> Router {
     Router::new()
@@ -46,6 +47,10 @@ pub fn router() -> Router {
         .route(
             "/api/v1/admin/tokens/refresh/async",
             post(refresh_tokens_api_async),
+        )
+        .route(
+            "/api/v1/admin/tokens/auto-refresh",
+            get(get_token_auto_refresh_state_api).post(run_token_auto_refresh_api),
         )
         .route("/api/v1/admin/tokens/nsfw/enable", post(enable_nsfw_api))
         .route(
@@ -346,6 +351,19 @@ async fn refresh_tokens_api_async(
         Json(json!({"status": "success", "task_id": task_id, "total": tokens.len()}))
             .into_response(),
     )
+}
+
+async fn get_token_auto_refresh_state_api(headers: HeaderMap) -> Result<Response, ApiError> {
+    verify_api_key(&headers).await?;
+    let state = snapshot_refresh_state().await;
+    Ok(Json(json!({"status": "success", "state": state})).into_response())
+}
+
+async fn run_token_auto_refresh_api(headers: HeaderMap) -> Result<Response, ApiError> {
+    verify_api_key(&headers).await?;
+    let result = refresh_tokens_with_tracking("manual_admin").await;
+    let state = snapshot_refresh_state().await;
+    Ok(Json(json!({"status": "success", "summary": result, "state": state})).into_response())
 }
 
 #[derive(Debug, Deserialize)]

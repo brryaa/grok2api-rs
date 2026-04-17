@@ -12,6 +12,7 @@ let currentBatchTaskId = null;
 let batchEventSource = null;
 let currentPage = 1;
 let pageSize = 50;
+let autoRefreshState = null;
 
 const byId = (id) => document.getElementById(id);
 const qsa = (selector) => document.querySelectorAll(selector);
@@ -95,6 +96,7 @@ async function init() {
   if (apiKey === null) return;
   setupConfirmDialog();
   loadData();
+  loadAutoRefreshState();
 }
 
 async function loadData() {
@@ -115,6 +117,74 @@ async function loadData() {
     }
   } catch (e) {
     showToast('加载失败: ' + e.message, 'error');
+  }
+}
+
+function formatTimestamp(timestamp) {
+  if (!timestamp) return '未执行';
+  const value = Number(timestamp);
+  if (!value) return '未执行';
+  return new Date(value).toLocaleString('zh-CN', { hour12: false });
+}
+
+function renderAutoRefreshState(state) {
+  autoRefreshState = state || null;
+  setText('auto-refresh-last-run', formatTimestamp(state && state.last_run_at));
+  setText('auto-refresh-last-success', state && state.last_success_at ? formatTimestamp(state.last_success_at) : '未恢复');
+  setText('auto-refresh-trigger', state && state.trigger ? state.trigger : '-');
+
+  const summary = state
+    ? `检 ${Number(state.checked || 0)} / 复 ${Number(state.recovered || 0)} / 失 ${Number(state.expired || 0)}`
+    : '-';
+  setText('auto-refresh-summary', summary);
+
+  const errorEl = byId('auto-refresh-error');
+  if (!errorEl) return;
+  const error = state && state.last_error ? String(state.last_error) : '';
+  if (error) {
+    errorEl.textContent = `最近错误: ${error}`;
+    errorEl.classList.remove('hidden');
+  } else {
+    errorEl.textContent = '';
+    errorEl.classList.add('hidden');
+  }
+}
+
+async function loadAutoRefreshState() {
+  try {
+    const res = await fetch('/api/v1/admin/tokens/auto-refresh', {
+      headers: buildAuthHeaders(apiKey)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      renderAutoRefreshState(data.state || null);
+    } else if (res.status === 401) {
+      logout();
+    }
+  } catch (_) {
+  }
+}
+
+async function runAutoRefreshCheck() {
+  const btn = byId('btn-auto-refresh-run');
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/v1/admin/tokens/auto-refresh', {
+      method: 'POST',
+      headers: buildAuthHeaders(apiKey)
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') {
+      throw new Error((data.error && data.error.message) || '检查失败');
+    }
+    renderAutoRefreshState(data.state || null);
+    loadData();
+    const recovered = data.summary ? Number(data.summary.recovered || 0) : 0;
+    showToast(`恢复检查完成，恢复 ${recovered} 个 Token`, recovered > 0 ? 'success' : 'info');
+  } catch (e) {
+    showToast(e.message || '检查失败', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -592,6 +662,7 @@ async function refreshStatus(token) {
     if (res.ok && data.status === 'success') {
       const isSuccess = data.results && data.results[token];
       loadData();
+      loadAutoRefreshState();
 
       if (isSuccess) {
         showToast('刷新成功', 'success');
@@ -721,6 +792,7 @@ function finishBatchProcess(aborted = false, options = {}) {
   setActionButtonsState();
   updateSelectionState();
   loadData(); // Final data refresh
+  loadAutoRefreshState();
 
   if (options.silent) return;
   if (aborted) {
