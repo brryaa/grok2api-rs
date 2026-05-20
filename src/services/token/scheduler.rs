@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use serde::Serialize;
 use tokio::task::JoinHandle;
@@ -33,7 +33,10 @@ pub async fn snapshot_refresh_state() -> TokenRefreshState {
     get_refresh_state().await.lock().await.clone()
 }
 
-pub async fn refresh_tokens_with_tracking(trigger: &str) -> HashMap<&'static str, i32> {
+pub async fn refresh_tokens_with_tracking(
+    trigger: &str,
+    force: bool,
+) -> HashMap<&'static str, i32> {
     let state = get_refresh_state().await;
     {
         let mut guard = state.lock().await;
@@ -44,7 +47,11 @@ pub async fn refresh_tokens_with_tracking(trigger: &str) -> HashMap<&'static str
 
     let mgr = get_token_manager().await;
     let mut mgr = mgr.lock().await;
-    let result = mgr.refresh_cooling_tokens().await;
+    let result = if force {
+        mgr.force_restore_quotas().await
+    } else {
+        mgr.refresh_cooling_tokens().await
+    };
 
     {
         let mut guard = state.lock().await;
@@ -82,7 +89,7 @@ impl TokenRefreshScheduler {
         let interval_secs = self.interval_hours.max(1) as u64 * 3600;
         self.handle = Some(tokio::spawn(async move {
             loop {
-                let _ = refresh_tokens_with_tracking("scheduler").await;
+                let _ = refresh_tokens_with_tracking("scheduler", false).await;
                 tokio::time::sleep(std::time::Duration::from_secs(interval_secs)).await;
             }
         }));

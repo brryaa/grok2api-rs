@@ -175,14 +175,14 @@ async function runAutoRefreshCheck() {
     });
     const data = await res.json();
     if (!res.ok || data.status !== 'success') {
-      throw new Error((data.error && data.error.message) || '检查失败');
+      throw new Error((data.error && data.error.message) || '恢复失败');
     }
     renderAutoRefreshState(data.state || null);
     loadData();
     const recovered = data.summary ? Number(data.summary.recovered || 0) : 0;
-    showToast(`恢复检查完成，恢复 ${recovered} 个 Token`, recovered > 0 ? 'success' : 'info');
+    showToast(`用量恢复完成，恢复 ${recovered} 次调用`, recovered > 0 ? 'success' : 'info');
   } catch (e) {
-    showToast(e.message || '检查失败', 'error');
+    showToast(e.message || '恢复失败', 'error');
   } finally {
     if (btn) btn.disabled = false;
   }

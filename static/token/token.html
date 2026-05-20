@@ -55,19 +55,19 @@
           <div>
             <div class="text-sm font-medium text-[var(--geist-foreground)]">自动恢复状态</div>
             <div class="mt-1 text-xs text-[var(--accents-5)]">
-              服务内部会按配置周期自动检查额度恢复，不需要再用外部 cron 改 `token.json`。
+              服务内部会按配置周期自动恢复额度，不需要再用外部 cron 改 `token.json`。
             </div>
           </div>
           <div class="flex items-center gap-2">
             <button id="btn-auto-refresh-run" onclick="runAutoRefreshCheck()" class="geist-button-outline text-xs px-3">
-              立即检查
+              立即恢复
             </button>
           </div>
         </div>
         <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
           <div class="stat-card !mb-0">
             <div class="stat-value text-base" id="auto-refresh-last-run">未执行</div>
-            <div class="stat-label">最近检查</div>
+            <div class="stat-label">最近恢复</div>
           </div>
           <div class="stat-card !mb-0">
             <div class="stat-value text-base" id="auto-refresh-last-success">未恢复</div>

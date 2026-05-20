@@ -133,9 +133,6 @@ impl TokenInfo {
         if matches!(self.status, TokenStatus::Disabled | TokenStatus::Expired) {
             return false;
         }
-        if self.quota > 0 {
-            return false;
-        }
         if self.last_sync_at.is_none() {
             return true;
         }

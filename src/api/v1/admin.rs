@@ -361,7 +361,7 @@ async fn get_token_auto_refresh_state_api(headers: HeaderMap) -> Result<Response
 
 async fn run_token_auto_refresh_api(headers: HeaderMap) -> Result<Response, ApiError> {
     verify_api_key(&headers).await?;
-    let result = refresh_tokens_with_tracking("manual_admin").await;
+    let result = refresh_tokens_with_tracking("manual_admin", true).await;
     let state = snapshot_refresh_state().await;
     Ok(Json(json!({"status": "success", "summary": result, "state": state})).into_response())
 }

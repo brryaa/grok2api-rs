@@ -283,65 +283,58 @@ impl TokenManager {
 
     pub async fn refresh_cooling_tokens(&mut self) -> HashMap<&'static str, i32> {
         let interval_hours: i64 = get_config("token.refresh_interval_hours", 8i64).await;
-        let mut to_refresh = Vec::new();
-        for pool in self.pools.values() {
-            for token in pool.list() {
-                if token.need_refresh(interval_hours) {
-                    to_refresh.push(token.token.clone());
-                }
-            }
-        }
-        if to_refresh.is_empty() {
-            return HashMap::from([
-                ("checked", 0),
-                ("refreshed", 0),
-                ("recovered", 0),
-                ("expired", 0),
-            ]);
-        }
-        let usage = UsageService::new().await;
+        self.restore_pool_quotas(interval_hours, false).await
+    }
+
+    pub async fn force_restore_quotas(&mut self) -> HashMap<&'static str, i32> {
+        self.restore_pool_quotas(0, true).await
+    }
+
+    async fn restore_pool_quotas(
+        &mut self,
+        interval_hours: i64,
+        force: bool,
+    ) -> HashMap<&'static str, i32> {
+        let mut checked = 0;
         let mut refreshed = 0;
         let mut recovered = 0;
-        let mut expired = 0;
-        for token_str in to_refresh {
-            if let Ok(result) = usage.get(&token_str, "grok-3").await {
-                if let Some(remain) = result.get("remainingTokens").and_then(|v| v.as_i64()) {
-                    if let Some(pool) = self
-                        .pools
-                        .values_mut()
-                        .find(|p| p.get(&token_str).is_some())
-                    {
-                        if let Some(tok) = pool.get_mut(&token_str) {
-                            let old_quota = tok.quota;
-                            tok.update_quota(remain as i32);
-                            tok.mark_synced();
-                            if old_quota == 0 && tok.quota > 0 {
-                                recovered += 1;
-                            }
-                        }
-                    }
+
+        for (pool_name, pool) in self.pools.iter_mut() {
+            let quota_key = format!("pool.{pool_name}.quota");
+            let target_quota: i32 = get_config(&quota_key, DEFAULT_QUOTA).await;
+
+            for token in pool.list() {
+                if matches!(token.status, TokenStatus::Disabled | TokenStatus::Expired) {
+                    continue;
                 }
-            } else {
-                if let Some(pool) = self
-                    .pools
-                    .values_mut()
-                    .find(|p| p.get(&token_str).is_some())
-                {
-                    if let Some(tok) = pool.get_mut(&token_str) {
-                        tok.status = TokenStatus::Expired;
-                        tok.mark_synced();
-                        expired += 1;
+                checked += 1;
+
+                if !force && !token.need_refresh(interval_hours) {
+                    continue;
+                }
+
+                if let Some(tok) = pool.get_mut(&token.token) {
+                    let old_quota = tok.quota;
+                    tok.update_quota(target_quota);
+                    tok.mark_synced();
+                    refreshed += 1;
+
+                    if old_quota < target_quota {
+                        recovered += target_quota - old_quota;
                     }
                 }
             }
-            refreshed += 1;
         }
-        self.save().await;
+
+        if refreshed > 0 {
+            self.save().await;
+        }
+
         HashMap::from([
-            ("checked", refreshed),
+            ("checked", checked),
             ("refreshed", refreshed),
             ("recovered", recovered),
-            ("expired", expired),
+            ("expired", 0),
         ])
     }
 }
