@@ -135,11 +135,14 @@ fn get_value(config: &JsonValue, key: &str) -> Option<JsonValue> {
     if !key.contains('.') {
         return config.get(key).cloned();
     }
-    let mut iter = key.split('.');
-    let section = iter.next()?;
-    let rest = iter.next()?;
+    let (section, rest) = key.split_once('.')?;
     match config.get(section) {
-        Some(JsonValue::Object(map)) => map.get(rest).cloned(),
+        Some(JsonValue::Object(map)) => {
+            if let Some(value) = map.get(rest) {
+                return Some(value.clone());
+            }
+            get_value(&JsonValue::Object(map.clone()), rest)
+        }
         _ => None,
     }
 }
@@ -220,4 +223,38 @@ fn json_to_toml(value: &JsonValue) -> toml::Value {
 
 pub fn config_to_toml(value: &JsonValue) -> toml::Value {
     json_to_toml(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::get_value;
+    use serde_json::json;
+
+    #[test]
+    fn get_value_prefers_exact_dotted_key_match() {
+        let config = json!({
+            "model": {
+                "grok-4": "ssoBasic",
+                "grok-4.1": "ssoSuper"
+            }
+        });
+
+        assert_eq!(
+            get_value(&config, "model.grok-4.1"),
+            Some(json!("ssoSuper"))
+        );
+    }
+
+    #[test]
+    fn get_value_still_supports_nested_objects() {
+        let config = json!({
+            "outer": {
+                "inner": {
+                    "value": 42
+                }
+            }
+        });
+
+        assert_eq!(get_value(&config, "outer.inner.value"), Some(json!(42)));
+    }
 }

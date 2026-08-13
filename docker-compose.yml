@@ -1,6 +1,8 @@
 services:
   grok2api-rs:
-    image: ${IMAGE:-ghcr.io/xeanyu/grok2api-rs:latest}
+    build:
+      context: .
+    image: ${IMAGE:-grok2api-rs:local}
     container_name: grok2api-rs
     restart: unless-stopped
     ports:
@@ -8,6 +10,7 @@ services:
     environment:
       SERVER_HOST: 0.0.0.0
       SERVER_PORT: 8000
-      RUST_LOG: ${RUST_LOG:-info}
+#      RUST_LOG: ${RUST_LOG:-info}
+      RUST_LOG: debug
     volumes:
       - ./data:/app/data

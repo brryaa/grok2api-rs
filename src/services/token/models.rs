@@ -130,7 +130,7 @@ impl TokenInfo {
     }
 
     pub fn need_refresh(&self, interval_hours: i64) -> bool {
-        if self.status != TokenStatus::Cooling {
+        if matches!(self.status, TokenStatus::Disabled | TokenStatus::Expired) {
             return false;
         }
         if self.last_sync_at.is_none() {

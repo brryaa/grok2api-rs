@@ -1,0 +1,10 @@
+# Local agent metadata
+.codex
+
+# Rust build output
+target/
+
+# Runtime state and secrets
+data/.locks/
+data/config.toml
+data/token.json

@@ -313,10 +313,7 @@ impl GrokChatService {
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("<unknown>")
                 .to_string();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| String::new());
+            let body = response.text().await.unwrap_or_else(|_| String::new());
             let preview = body_preview(&body, 220);
             if !preview.is_empty() {
                 tracing::warn!(

@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::core::config::get_config;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Tier {
@@ -117,7 +119,11 @@ impl ModelService {
         Self::get(model_id).is_some()
     }
 
-    pub fn pool_for_model(model_id: &str) -> String {
+    pub async fn pool_for_model(model_id: &str) -> String {
+        let configured_pool: String = get_config(&format!("model.{model_id}"), String::new()).await;
+        if !configured_pool.trim().is_empty() {
+            return configured_pool.trim().to_string();
+        }
         if let Some(m) = Self::get(model_id) {
             if m.tier == Tier::Super {
                 return "ssoSuper".to_string();
